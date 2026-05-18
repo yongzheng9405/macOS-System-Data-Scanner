@@ -1,0 +1,12 @@
+.idea*
+__pycache__/
+.pytest_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+system-data-report.json
+system-data-report.md
+system_scan_report/
+.github/
+openspec/
