@@ -82,20 +82,69 @@ The folder is created automatically if it does not exist.
 
 ### Useful options
 
+| Option | Default | Description |
+| --- | --- | --- |
+| `--json-output` | `system_scan_report/system-data-report.json` | Path for the structured JSON report |
+| `--markdown-output` | `system_scan_report/system-data-report.md` | Path for the human-readable Markdown report |
+| `--top-directories` | `10` | Number of directories to include in the ranked summary |
+| `--top-files` | `20` | Number of files to include in the ranked summary |
+| `--min-size-mb` | `50` | Minimum size threshold (MB) for ranked report sections |
+| `--stale-days` | `365` | Days since last modification before an item is flagged as stale |
+
+### Example: quick default scan
+
+Just run the scanner with no arguments to get started:
+
 ```bash
-PYTHONPATH=src python3 -m macos_system_data_scanner \
-  --json-output reports/system-data.json \
-  --markdown-output reports/system-data.md \
-  --top-directories 15 \
-  --top-files 30 \
-  --min-size-mb 25
+macos-system-data-scanner
 ```
 
-- `--json-output`: path for the structured JSON report (overrides the default location)
-- `--markdown-output`: path for the human-readable Markdown report (overrides the default location)
-- `--top-directories`: number of directories to include in the ranked summary
-- `--top-files`: number of files to include in the ranked summary
-- `--min-size-mb`: minimum size threshold for ranked report sections
+This writes JSON + Markdown reports to `system_scan_report/` in the current directory, using all defaults.
+
+### Example: find items untouched for 2+ years
+
+Identify large directories and files that have not been modified in over two years — strong candidates for cleanup:
+
+```bash
+macos-system-data-scanner --stale-days 730
+```
+
+The report will include a **"Stale Large Items"** section sorted oldest-first, showing the last-modified age of each item.
+
+### Example: raise the ranking threshold to focus on big offenders
+
+Skip items smaller than 500 MB and expand the directory / file lists to surface more detail:
+
+```bash
+macos-system-data-scanner \
+  --min-size-mb 500 \
+  --top-directories 20 \
+  --top-files 40
+```
+
+### Example: save reports to a custom location
+
+Redirect output to a dedicated folder for versioned comparisons:
+
+```bash
+macos-system-data-scanner \
+  --json-output ~/Desktop/scan-2026-05/report.json \
+  --markdown-output ~/Desktop/scan-2026-05/report.md
+```
+
+### Example: comprehensive deep scan
+
+Combine all options for a thorough analysis — low size threshold, large item lists, and 180-day staleness window:
+
+```bash
+macos-system-data-scanner \
+  --min-size-mb 10 \
+  --top-directories 30 \
+  --top-files 50 \
+  --stale-days 180 \
+  --json-output ~/Desktop/deep-scan.json \
+  --markdown-output ~/Desktop/deep-scan.md
+```
 
 ## Report interpretation
 
@@ -106,6 +155,7 @@ The generated JSON report includes:
 - top directories
 - top files
 - unknown large items
+- **stale large items** (items not modified within the configured threshold)
 - scan limitations
 
 The Markdown report contains the same underlying data in a review-friendly summary.
@@ -122,8 +172,9 @@ The Markdown report contains the same underlying data in a review-friendly summa
 1. Run the scanner.
 2. Review the largest categories and paths.
 3. Inspect anything labeled `safe-review` first.
-4. Be cautious with `needs-care` items such as backups, containers, and application support data.
-5. If you're unsure, share the JSON report with an AI or ask for human review before deleting anything.
+4. Check the **Stale Large Items** section — anything not modified in over a year is a good starting point for cleanup.
+5. Be cautious with `needs-care` items such as backups, containers, and application support data.
+6. If you're unsure, share the JSON report with an AI or ask for human review before deleting anything.
 
 ## Development
 
@@ -131,4 +182,23 @@ Run the test suite with:
 
 ```bash
 python3 -m unittest discover -s tests
+```
+
+### CI (Pull Request checks)
+
+This project includes a GitHub Actions workflow at `.github/workflows/ci.yml`.
+
+- On every pull request (and pushes to `main`/`master`), CI runs:
+  - test matrix: Python `3.10`, `3.11`, `3.12` on `ubuntu-latest` and `macos-latest`
+  - quality gates: `ruff` (lint), `mypy` (type checks), `bandit` (security scan)
+
+Local equivalents:
+
+```bash
+python3 -m pip install -e .
+python3 -m pip install ruff mypy bandit
+ruff check src
+mypy src
+bandit -q -r src
+PYTHONPATH=src python3 -m unittest discover -s tests
 ```

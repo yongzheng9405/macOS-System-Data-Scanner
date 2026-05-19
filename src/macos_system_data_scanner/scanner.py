@@ -100,6 +100,7 @@ def scan_targets(
                     size_bytes=_disk_usage_bytes(target_stat),
                     entry_type="file",
                     target_name=target.name,
+                    last_modified_at=target_stat.st_mtime,
                 ),
                 Path(target.path).expanduser(),
                 options,
@@ -184,6 +185,7 @@ def _scan_directory(
                                 size_bytes=_disk_usage_bytes(file_stat),
                                 entry_type="file",
                                 target_name=target_name,
+                                last_modified_at=file_stat.st_mtime,
                             ),
                             target_root,
                             options,
@@ -257,6 +259,8 @@ def _record_file_entry(
 ) -> None:
     snapshot.total_observed_bytes += entry.size_bytes
     _aggregate_directory_sizes(snapshot, Path(entry.path), target_root, entry.target_name, entry.size_bytes)
+    if entry.last_modified_at is not None:
+        _aggregate_directory_newest_mtime(snapshot, Path(entry.path), target_root, entry.last_modified_at)
 
     classified = classify_entry(entry)
     key = (
@@ -291,6 +295,23 @@ def _aggregate_directory_sizes(
         key = str(current)
         snapshot.directory_sizes[key] = snapshot.directory_sizes.get(key, 0) + size_bytes
         snapshot.directory_targets[key] = target_name
+        if current == target_root:
+            break
+        current = current.parent
+
+
+def _aggregate_directory_newest_mtime(
+    snapshot: ScanSnapshot,
+    file_path: Path,
+    target_root: Path,
+    mtime: float,
+) -> None:
+    current = file_path.parent
+    while current == target_root or target_root in current.parents:
+        key = str(current)
+        existing = snapshot.directory_newest_mtime.get(key)
+        if existing is None or mtime > existing:
+            snapshot.directory_newest_mtime[key] = mtime
         if current == target_root:
             break
         current = current.parent

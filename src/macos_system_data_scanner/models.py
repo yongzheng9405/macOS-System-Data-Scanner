@@ -26,6 +26,7 @@ class ScanOptions:
     top_directories: int = 10
     top_files: int = 20
     minimum_report_size_bytes: int = 50 * 1024 * 1024
+    stale_threshold_days: int = 365
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class ObservedEntry:
     entry_type: EntryType
     target_name: str
     is_partial: bool = False
+    last_modified_at: float | None = None
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ class ClassifiedFinding:
     review_guidance: str
     rule_id: str
     explanation: str
+    last_modified_at: float | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +79,7 @@ class ScanSnapshot:
     category_totals: dict[tuple[str, str, str], dict[str, int]] = field(default_factory=dict)
     directory_sizes: dict[str, int] = field(default_factory=dict)
     directory_targets: dict[str, str] = field(default_factory=dict)
+    directory_newest_mtime: dict[str, float] = field(default_factory=dict)
     partial_directories: set[str] = field(default_factory=set)
     omitted_limitations: int = 0
     limitations: list[ObservationLimit] = field(default_factory=list)
@@ -92,6 +96,7 @@ class ScanReport:
     top_files: list[ClassifiedFinding]
     unknown_large_items: list[ClassifiedFinding]
     limitations: list[ObservationLimit]
+    stale_large_items: list[ClassifiedFinding] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)

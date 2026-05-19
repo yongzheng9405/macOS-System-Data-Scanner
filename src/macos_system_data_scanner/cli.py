@@ -46,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OPTIONS.minimum_report_size_bytes / (1024 * 1024),
         help="Minimum size in MB for ranked report sections.",
     )
+    parser.add_argument(
+        "--stale-days",
+        type=int,
+        default=DEFAULT_OPTIONS.stale_threshold_days,
+        help=f"Days since last modification before an item is considered stale (default: {DEFAULT_OPTIONS.stale_threshold_days}).",
+    )
     return parser
 
 
@@ -64,11 +70,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--top-directories and --top-files must be positive integers.")
     if args.min_size_mb < 0:
         parser.error("--min-size-mb must be zero or greater.")
+    if args.stale_days <= 0:
+        parser.error("--stale-days must be a positive integer.")
 
     options = ScanOptions(
         top_directories=args.top_directories,
         top_files=args.top_files,
         minimum_report_size_bytes=int(args.min_size_mb * 1024 * 1024),
+        stale_threshold_days=args.stale_days,
     )
 
     print("Starting macOS System Data scan...", flush=True)

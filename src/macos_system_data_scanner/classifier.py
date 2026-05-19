@@ -117,6 +117,7 @@ def classify_entry(entry: ObservedEntry) -> ClassifiedFinding:
                 review_guidance=rule.review_guidance,
                 rule_id=rule.rule_id,
                 explanation=rule.explanation,
+                last_modified_at=entry.last_modified_at,
             )
 
     return ClassifiedFinding(
@@ -130,6 +131,7 @@ def classify_entry(entry: ObservedEntry) -> ClassifiedFinding:
         review_guidance="needs-care",
         rule_id="unknown",
         explanation="This path did not match any known classification rule and needs manual review.",
+        last_modified_at=entry.last_modified_at,
     )
 
 
