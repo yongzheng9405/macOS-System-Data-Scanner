@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -50,6 +51,8 @@ def build_report(snapshot: ScanSnapshot, options: ScanOptions) -> ScanReport:
                 max(options.top_directories, options.top_files),
             )
 
+    stale_large_items = _build_stale_items(top_directories, top_files, options)
+
     return ScanReport(
         generated_at=datetime.now(timezone.utc).isoformat(),
         included_targets=snapshot.included_targets,
@@ -60,6 +63,7 @@ def build_report(snapshot: ScanSnapshot, options: ScanOptions) -> ScanReport:
         top_files=top_files,
         unknown_large_items=unknown_large_items[: max(options.top_directories, options.top_files)],
         limitations=snapshot.limitations,
+        stale_large_items=stale_large_items,
     )
 
 
@@ -110,6 +114,14 @@ def render_markdown_report(report: ScanReport) -> str:
 
     lines.extend(["", "## Unknown Large Items", ""])
     lines.extend(_render_findings(report.unknown_large_items))
+
+    lines.extend(["", "## Stale Large Items", ""])
+    lines.append(
+        f"> Items not modified in over {report.options.stale_threshold_days} days. "
+        "These may be safe to delete but review carefully."
+    )
+    lines.append("")
+    lines.extend(_render_findings(report.stale_large_items))
 
     lines.extend(["", "## Limitations", ""])
     if report.limitations:
@@ -165,6 +177,7 @@ def _build_directory_candidates(snapshot: ScanSnapshot) -> list[ClassifiedFindin
             entry_type="directory",
             target_name=target_name,
             is_partial=directory_path in snapshot.partial_directories,
+            last_modified_at=snapshot.directory_newest_mtime.get(directory_path),
         )
         findings.append(classify_entry(observed))
 
@@ -239,9 +252,51 @@ def _render_findings(findings: list[ClassifiedFinding]) -> list[str]:
             f"({finding.category_label}, `{finding.review_guidance}`)"
         )
         lines.append(f"  - {finding.explanation}")
+        if finding.last_modified_at is not None:
+            lines.append(f"  - Last modified: {_format_age(finding.last_modified_at)}")
         if finding.is_partial:
             lines.append("  - Partial scan: one or more descendants could not be fully inspected.")
     return lines
+
+
+def _format_age(mtime: float) -> str:
+    now = time.time()
+    age_seconds = now - mtime
+    age_days = age_seconds / 86400
+    if age_days < 1:
+        return "today"
+    if age_days < 30:
+        return f"{int(age_days)} days ago"
+    if age_days < 365:
+        months = int(age_days / 30)
+        return f"{months} month{'s' if months > 1 else ''} ago"
+    years = int(age_days / 365)
+    months = int((age_days % 365) / 30)
+    if months > 0:
+        return f"{years} year{'s' if years > 1 else ''}, {months} month{'s' if months > 1 else ''} ago"
+    return f"{years} year{'s' if years > 1 else ''} ago"
+
+
+def _build_stale_items(
+    top_directories: list[ClassifiedFinding],
+    top_files: list[ClassifiedFinding],
+    options: ScanOptions,
+) -> list[ClassifiedFinding]:
+    threshold_seconds = options.stale_threshold_days * 86400
+    cutoff = time.time() - threshold_seconds
+    limit = max(options.top_directories, options.top_files)
+
+    seen_paths: set[str] = set()
+    stale: list[ClassifiedFinding] = []
+    for finding in top_directories + top_files:
+        if finding.path in seen_paths:
+            continue
+        seen_paths.add(finding.path)
+        if finding.last_modified_at is not None and finding.last_modified_at < cutoff:
+            stale.append(finding)
+
+    stale.sort(key=lambda f: f.last_modified_at or 0)
+    return stale[:limit]
 
 
 def format_bytes(size_bytes: int) -> str:

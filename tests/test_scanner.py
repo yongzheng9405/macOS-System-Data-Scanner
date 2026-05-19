@@ -230,5 +230,32 @@ class ScannerTests(unittest.TestCase):
                 )
 
 
+    def test_stale_items_are_identified_correctly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base = Path(tmpdir)
+            target = base / "Library" / "Caches"
+            write_bytes(target / "fresh.bin", 1024 * 1024)
+            write_bytes(target / "old.bin", 2 * 1024 * 1024)
+
+            old_path = target / "old.bin"
+            old_epoch = 0.0  # Unix epoch = many years ago
+            os.utime(old_path, (old_epoch, old_epoch))
+
+            options = ScanOptions(
+                top_directories=5,
+                top_files=5,
+                minimum_report_size_bytes=0,
+                stale_threshold_days=365,
+            )
+            report = build_report(
+                scan_targets([ScanTarget("caches", str(target), "Caches")], options),
+                options,
+            )
+
+        stale_paths = {f.path for f in report.stale_large_items}
+        self.assertIn(str(old_path), stale_paths)
+        self.assertNotIn(str(target / "fresh.bin"), stale_paths)
+
+
 if __name__ == "__main__":
     unittest.main()
