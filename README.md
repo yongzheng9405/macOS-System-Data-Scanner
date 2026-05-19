@@ -183,3 +183,22 @@ Run the test suite with:
 ```bash
 python3 -m unittest discover -s tests
 ```
+
+### CI (Pull Request checks)
+
+This project includes a GitHub Actions workflow at `.github/workflows/ci.yml`.
+
+- On every pull request (and pushes to `main`/`master`), CI runs:
+  - test matrix: Python `3.10`, `3.11`, `3.12` on `ubuntu-latest` and `macos-latest`
+  - quality gates: `ruff` (lint), `mypy` (type checks), `bandit` (security scan)
+
+Local equivalents:
+
+```bash
+python3 -m pip install -e .
+python3 -m pip install ruff mypy bandit
+ruff check src
+mypy src
+bandit -q -r src
+PYTHONPATH=src python3 -m unittest discover -s tests
+```
